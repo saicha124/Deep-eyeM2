@@ -3,6 +3,8 @@ Configuration loader utility
 """
 
 import yaml
+import os
+import re
 from pathlib import Path
 from typing import Dict, Any
 from utils.logger import get_logger
@@ -34,12 +36,39 @@ class ConfigLoader:
             with open(config_file, 'r') as f:
                 config = yaml.safe_load(f)
             
+            # Expand environment variables in config
+            config = ConfigLoader._expand_env_vars(config)
+            
             logger.info(f"Configuration loaded from {config_path}")
             return config
         
         except Exception as e:
             logger.error(f"Error loading configuration: {e}")
             return ConfigLoader._get_default_config()
+    
+    @staticmethod
+    def _expand_env_vars(config: Any) -> Any:
+        """
+        Recursively expand environment variables in config.
+        Supports ${VAR_NAME} syntax.
+        """
+        if isinstance(config, dict):
+            return {k: ConfigLoader._expand_env_vars(v) for k, v in config.items()}
+        elif isinstance(config, list):
+            return [ConfigLoader._expand_env_vars(item) for item in config]
+        elif isinstance(config, str):
+            # Replace ${VAR_NAME} with environment variable value
+            pattern = r'\$\{([^}]+)\}'
+            matches = re.findall(pattern, config)
+            for var_name in matches:
+                env_value = os.environ.get(var_name, '')
+                if env_value:
+                    config = config.replace(f'${{{var_name}}}', env_value)
+                else:
+                    logger.warning(f"Environment variable {var_name} not found")
+            return config
+        else:
+            return config
     
     @staticmethod
     def _get_default_config() -> Dict[str, Any]:
