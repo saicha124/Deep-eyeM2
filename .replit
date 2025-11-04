@@ -1,4 +1,4 @@
-modules = ["bash", "python-3.11"]
+modules = ["python-3.12", "bash"]
 [agent]
 expertMode = true
 
@@ -22,9 +22,9 @@ args = "Deep Eye Scanner"
 name = "Deep Eye Scanner"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "echo \"Deep Eye v1.3.0 (Hestia) - Security Scanner Ready\" && echo \"\" && echo \"Usage: python deep_eye.py -u <target-url>\" && echo \"Example: python deep_eye.py -u https://example.com\" && tail -f /dev/null"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python deep_eye.py --help"
