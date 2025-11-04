@@ -25,11 +25,26 @@ Deep Eye is an advanced AI-driven vulnerability scanner and penetration testing 
 - Multi-channel notifications (Email, Slack, Discord)
 
 ## Setup & Configuration
-The tool requires configuration in `config/config.yaml`:
-1. Copy `config/config.example.yaml` to `config/config.yaml`
-2. Add API keys for at least one AI provider (OpenAI, Claude, Grok, or OLLAMA)
-3. Configure scanner settings (depth, threads, scan modes)
-4. Set up reporting preferences
+
+### Current Configuration (Ready to Use)
+The tool is configured and ready to scan without AI:
+- **AI Providers**: Disabled (uses default payloads)
+- **Payload Generation**: Using built-in default payloads
+- **ML Detection**: Disabled (requires training data)
+- **All Core Scanners**: Enabled (SQL injection, XSS, SSRF, etc.)
+
+### To Enable AI Features (Optional)
+1. Edit `config/config.yaml`
+2. Add API keys for OpenAI, Claude, Grok, or OLLAMA
+3. Enable the provider: `enabled: true`
+4. Enable AI payloads: `payload_generation.use_ai: true`
+
+### Configuration File
+Location: `config/config.yaml`
+- Scanner settings (depth, threads, timeouts)
+- Enabled vulnerability checks
+- Report formats and preferences
+- Network settings (proxy, headers, cookies)
 
 ## Usage
 ```bash
@@ -63,19 +78,24 @@ python deep_eye.py --version
 - `data/` - Session and model data (gitignored)
 
 ## Recent Changes
-- **Enhanced Vulnerability Reporting** (Latest)
+
+- **Import Completed - November 4, 2025**
+  - Python 3.11 environment configured
+  - All 60+ dependencies installed successfully
+  - Configuration setup with AI disabled for default payload scanning
+  - Fixed issue: Scanner was failing due to invalid AI API keys
+  - Solution: Disabled AI providers to use built-in default payloads
+  - ML anomaly detection disabled (requires baseline training data)
+  - Scanner now working correctly with default vulnerability detection
+  - Successfully tested against Web Security Academy lab (found 18+ vulnerabilities)
+  
+- **Enhanced Vulnerability Reporting** 
   - Added timestamps to all vulnerability records showing when they were discovered
   - Added detailed remediation guidance with priority levels and fix time estimates
   - Included step-by-step remediation instructions
   - Added secure code examples for common vulnerabilities
   - Included references and resources (OWASP, CWE) for each vulnerability type
   - Enhanced both HTML and PDF reports with new sections
-  
-- Initial Replit setup completed
-- Python 3.11 environment configured
-- All dependencies installed
-- Required directories created
-- Configuration template copied
 
 ## Enhanced Reporting Features
 
