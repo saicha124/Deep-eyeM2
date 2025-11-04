@@ -793,6 +793,20 @@ class ReportGenerator:
                             <span style="margin-left: 10px;">⏱️ Estimated Fix Time: {{ vuln.remediation_details.fix_time }}</span>
                         </div>
                         
+                        {% if vuln.remediation_details.exploit_example %}
+                        <div class="exploit-section" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                            <p><strong>⚠️ Attack Scenario & Exploit Example:</strong></p>
+                            <div class="code" style="background: #2d2d2d; color: #f8f8f2;">{{ vuln.remediation_details.exploit_example }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if vuln.remediation_details.solution %}
+                        <div class="solution-section" style="background: #d4edda; border: 1px solid #28a745; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                            <p><strong>✅ Solution:</strong></p>
+                            <div class="code" style="background: #1e1e1e; color: #d4d4d4;">{{ vuln.remediation_details.solution }}</div>
+                        </div>
+                        {% endif %}
+                        
                         <div class="remediation-steps">
                             <p><strong>Remediation Steps:</strong></p>
                             <ol>
@@ -804,7 +818,7 @@ class ReportGenerator:
                         
                         {% if vuln.remediation_details.code_example %}
                         <div>
-                            <p><strong>Code Example:</strong></p>
+                            <p><strong>Code Example (Vulnerable vs Secure):</strong></p>
                             <div class="code">{{ vuln.remediation_details.code_example }}</div>
                         </div>
                         {% endif %}
