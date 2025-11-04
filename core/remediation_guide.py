@@ -1452,6 +1452,196 @@ ERROR CODE: CWE-362 (Race Condition)
                 'CWE-362: Concurrent Execution',
                 'https://owasp.org/www-community/vulnerabilities/Race_Conditions'
             ]
+        },
+        
+        'Security Misconfiguration': {
+            'priority': 'MEDIUM',
+            'fix_time': '1-2 days',
+            'steps': [
+                'Add all missing security headers to HTTP responses',
+                'Configure Content-Security-Policy to prevent XSS attacks',
+                'Enable HTTP Strict Transport Security (HSTS)',
+                'Disable directory listings and unnecessary HTTP methods',
+                'Remove server version information from headers',
+                'Configure secure session cookies (Secure, HttpOnly, SameSite)',
+                'Disable debug mode and verbose errors in production'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Security Misconfiguration:
+1. Missing X-Content-Type-Options: nosniff
+   - Attacker can exploit MIME type sniffing
+   - Browser may execute malicious content as JavaScript
+   - Example: Upload image.jpg containing JavaScript, browser executes it
+
+2. Missing X-Frame-Options or CSP frame-ancestors
+   - Attacker creates iframe embedding your site
+   - Enables clickjacking attacks
+   - Example: <iframe src="https://victim.com/transfer"></iframe>
+
+3. Missing Content-Security-Policy
+   - Allows inline JavaScript execution
+   - XSS attacks become easier
+   - No protection against code injection
+
+4. Missing HSTS (Strict-Transport-Security)
+   - Man-in-the-middle attacks possible
+   - SSL stripping attacks
+   - Users can be downgraded to HTTP
+
+5. Server version disclosure
+   - Reveals exact server version in headers
+   - Attackers can target known vulnerabilities
+   - Example: Server: Apache/2.4.48 (Ubuntu)
+
+COMMON VULNERABLE HEADERS:
+- Missing: X-Content-Type-Options
+- Missing: X-Frame-Options  
+- Missing: Content-Security-Policy
+- Missing: Strict-Transport-Security
+- Missing: X-XSS-Protection
+- Present: Server version information
+''',
+            'code_example': '''
+# Bad (No security headers):
+@app.route('/page')
+def page():
+    return render_template('page.html')
+
+# Good (Secure headers - Python/Flask):
+from flask import Flask, make_response
+
+@app.after_request
+def add_security_headers(response):
+    # Prevent MIME sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    
+    # Content Security Policy
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    
+    # Force HTTPS
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    
+    # XSS Protection
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Referrer Policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Permissions Policy
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    
+    return response
+
+# Good (Secure headers - Django):
+# middleware.py
+class SecurityHeadersMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['X-Frame-Options'] = 'DENY'
+        response['Content-Security-Policy'] = "default-src 'self'"
+        response['Strict-Transport-Security'] = 'max-age=31536000'
+        return response
+
+# Good (Secure headers - Node.js/Express):
+const helmet = require('helmet');
+app.use(helmet());
+
+// Or manually:
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "default-src 'self'");
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+    next();
+});
+
+# Good (Apache .htaccess):
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set Content-Security-Policy "default-src 'self'"
+    Header set Strict-Transport-Security "max-age=31536000"
+    Header unset Server
+    Header unset X-Powered-By
+</IfModule>
+
+# Good (Nginx):
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Content-Security-Policy "default-src 'self'" always;
+add_header Strict-Transport-Security "max-age=31536000" always;
+server_tokens off;
+''',
+            'solution': '''
+SOLUTION - Security Headers Configuration:
+
+1. X-CONTENT-TYPE-OPTIONS (Prevents MIME sniffing):
+   X-Content-Type-Options: nosniff
+   - Prevents browsers from interpreting files as different MIME type
+   - Stops image files being executed as JavaScript
+   - Essential for upload functionality security
+
+2. X-FRAME-OPTIONS (Prevents clickjacking):
+   X-Frame-Options: DENY
+   Or: X-Frame-Options: SAMEORIGIN
+   - Prevents your site from being embedded in iframes
+   - Protects against clickjacking attacks
+   - Use SAMEORIGIN if you need to iframe your own pages
+
+3. CONTENT-SECURITY-POLICY (Prevents XSS):
+   Content-Security-Policy: default-src 'self'; script-src 'self'
+   - Controls which resources can be loaded
+   - Prevents inline JavaScript execution
+   - Strong defense against XSS attacks
+
+4. STRICT-TRANSPORT-SECURITY (Enforces HTTPS):
+   Strict-Transport-Security: max-age=31536000; includeSubDomains
+   - Forces browser to always use HTTPS
+   - Prevents SSL stripping attacks
+   - Protects against man-in-the-middle
+
+5. HIDE SERVER VERSION:
+   - Apache: ServerTokens Prod, ServerSignature Off
+   - Nginx: server_tokens off;
+   - Remove X-Powered-By header
+   - Don't reveal technology stack
+
+6. SECURE COOKIES:
+   Set-Cookie: session=...; Secure; HttpOnly; SameSite=Strict
+   - Secure: Only send over HTTPS
+   - HttpOnly: Prevent JavaScript access
+   - SameSite: Prevent CSRF attacks
+
+QUICK FIX FOR YOUR ISSUE (X-Content-Type-Options missing):
+Add this header to all HTTP responses:
+X-Content-Type-Options: nosniff
+
+IMPLEMENTATION EXAMPLES:
+- Python/Flask: response.headers['X-Content-Type-Options'] = 'nosniff'
+- Django: SECURE_CONTENT_TYPE_NOSNIFF = True in settings.py
+- Node.js/Express: res.setHeader('X-Content-Type-Options', 'nosniff')
+- Apache: Header set X-Content-Type-Options "nosniff"
+- Nginx: add_header X-Content-Type-Options "nosniff" always;
+
+ERROR CODE REFERENCE:
+- CWE-16: Configuration
+- CWE-2007 Missing Security Headers
+- OWASP A05:2021 - Security Misconfiguration
+''',
+            'references': [
+                'OWASP Security Headers Cheat Sheet',
+                'CWE-16: Configuration',
+                'https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html',
+                'https://securityheaders.com/',
+                'https://owasp.org/www-project-secure-headers/'
+            ]
         }
     }
     
