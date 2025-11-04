@@ -80,7 +80,7 @@ python deep_eye.py --version
 ## Recent Changes
 
 - **Comprehensive Remediation Guides Added - November 4, 2025**
-  - Enhanced remediation guides for 9 additional vulnerabilities with error codes and solutions
+  - Enhanced remediation guides for 15+ vulnerabilities with error codes and solutions
   - **Information Disclosure**: CWE-209, CWE-200, CWE-497 with debug mode fixes
   - **Local File Inclusion (LFI)**: CWE-22, CWE-98, CWE-73 with whitelist implementation
   - **Remote File Inclusion (RFI)**: CWE-98 with PHP configuration hardening
@@ -90,6 +90,12 @@ python deep_eye.py --version
   - **CORS Misconfiguration**: CWE-346 with origin whitelisting
   - **Sensitive Data Exposure**: CWE-311, CWE-312, CWE-319 with encryption
   - **Broken Authentication**: CWE-287 with MFA and lockout mechanisms
+  - **Business Logic Vulnerabilities**: CWE-840, CWE-841, CWE-362
+    - Price Manipulation: Server-side validation, cryptographic verification
+    - Negative Quantity: Input validation, maximum limits
+    - Excessive Quantity: Inventory checks, business rules
+    - Workflow Bypass: State management, step verification
+    - Race Condition: Database locking, atomic operations
   - All guides include: attack scenarios, error codes, code examples, and step-by-step solutions
 
 - **Import Completed - November 4, 2025**

@@ -1131,6 +1131,327 @@ ERROR CODE: CWE-287 (Improper Authentication)
                 'CWE-287: Improper Authentication',
                 'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html'
             ]
+        },
+        
+        'Business Logic - Price Manipulation': {
+            'priority': 'CRITICAL',
+            'fix_time': '1-2 days',
+            'steps': [
+                'Validate all price calculations server-side',
+                'Never trust client-provided prices',
+                'Implement server-side price lookups from database',
+                'Use cryptographic signatures for price verification',
+                'Log all price modifications for audit',
+                'Implement price range validation',
+                'Use decimal precision for currency calculations'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Price Manipulation:
+1. Find price parameter in request: POST /checkout {price: 99.99, productId: 123}
+2. Modify price to negative or zero: {price: -50.00, productId: 123}
+3. Complete purchase with manipulated price
+4. Attacker receives money instead of paying
+
+COMMON ERROR: Application trusts client-sent prices
+ATTACK PAYLOADS:
+price=-100.00
+price=0.01
+price=null
+amount=-999999
+''',
+            'code_example': '''
+# Bad (Vulnerable - trusts client):
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    price = request.json['price']
+    product_id = request.json['productId']
+    # Uses client-provided price!
+    process_payment(price)
+
+# Good (Secure - server-side validation):
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    product_id = request.json['productId']
+    
+    # Lookup price from database
+    product = Product.query.get(product_id)
+    if not product:
+        return {"error": "Invalid product"}, 400
+    
+    # Use server-side price
+    server_price = product.price
+    
+    # Validate price is positive
+    if server_price <= 0:
+        return {"error": "Invalid price"}, 400
+    
+    # Log transaction
+    log_transaction(product_id, server_price)
+    
+    # Process with server price
+    process_payment(server_price)
+''',
+            'solution': '''
+SOLUTION - Prevent Price Manipulation:
+
+1. SERVER-SIDE PRICE VALIDATION:
+   - NEVER trust client-provided prices
+   - Always lookup prices from your database
+   - Validate price > 0 before processing
+
+2. CRYPTOGRAPHIC VERIFICATION:
+   - Sign prices with HMAC when sending to client
+   - Verify signature before processing payment
+   - Detect tampering attempts
+
+3. AUDIT LOGGING:
+   - Log all price changes and transactions
+   - Monitor for suspicious price patterns
+   - Alert on negative or zero prices
+
+4. INPUT VALIDATION:
+   - Reject negative values
+   - Reject prices outside expected range
+   - Use decimal types for currency (not float)
+
+ERROR CODE REFERENCE:
+- CWE-840: Business Logic Errors
+- CWE-841: Improper Enforcement of Behavioral Workflow
+- OWASP: Business Logic Vulnerability
+
+FINANCIAL IMPACT: Direct monetary loss, fraud, chargebacks
+''',
+            'references': [
+                'OWASP Business Logic Vulnerabilities',
+                'CWE-840: Business Logic Errors',
+                'https://owasp.org/www-community/vulnerabilities/Business_logic_vulnerability',
+                'https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html'
+            ]
+        },
+        
+        'Business Logic - Negative Quantity': {
+            'priority': 'HIGH',
+            'fix_time': '1 day',
+            'steps': [
+                'Validate quantity is a positive integer',
+                'Implement server-side quantity checks',
+                'Set maximum quantity limits',
+                'Reject negative values immediately',
+                'Log suspicious quantity attempts',
+                'Implement cart validation before checkout'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Negative Quantity:
+1. Add item to cart with normal quantity
+2. Modify quantity to negative value: -5
+3. Checkout with negative quantity
+4. Result: Refund instead of payment
+
+ATTACK PAYLOADS:
+quantity=-1
+qty=-999
+amount=-10
+count=-5
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+quantity = int(request.POST['quantity'])
+total_price = item.price * quantity
+# Negative quantity results in negative total!
+
+# Good (Secure):
+quantity = int(request.POST.get('quantity', 0))
+
+# Validate quantity
+if quantity < 1:
+    return {"error": "Quantity must be positive"}, 400
+if quantity > 100:
+    return {"error": "Maximum quantity is 100"}, 400
+
+# Calculate total
+total_price = item.price * quantity
+if total_price <= 0:
+    return {"error": "Invalid total"}, 400
+''',
+            'solution': '''
+SOLUTION:
+1. Validate quantity >= 1
+2. Set maximum quantity limit (e.g., 100)
+3. Reject any negative values
+4. Validate total price > 0
+5. Server-side validation always
+
+ERROR CODE: CWE-840 (Business Logic Errors)
+IMPACT: Financial loss through refund manipulation
+''',
+            'references': [
+                'OWASP Business Logic Vulnerabilities',
+                'CWE-840: Business Logic Errors',
+                'https://owasp.org/www-community/vulnerabilities/Business_logic_vulnerability'
+            ]
+        },
+        
+        'Business Logic - Excessive Quantity': {
+            'priority': 'MEDIUM',
+            'fix_time': '1 day',
+            'steps': [
+                'Implement maximum quantity limits per transaction',
+                'Check inventory availability',
+                'Validate against reasonable business limits',
+                'Implement rate limiting for large orders',
+                'Add manual review for high-value orders'
+            ],
+            'code_example': '''
+# Bad (No limits):
+quantity = request.POST['quantity']
+process_order(quantity)
+
+# Good (With limits):
+MAX_QUANTITY = 100
+quantity = int(request.POST.get('quantity', 0))
+
+if quantity > MAX_QUANTITY:
+    return {"error": f"Maximum quantity is {MAX_QUANTITY}"}, 400
+
+# Check inventory
+if quantity > item.stock:
+    return {"error": "Insufficient stock"}, 400
+
+process_order(quantity)
+''',
+            'solution': '''
+SOLUTION:
+1. Set maximum quantity per order
+2. Check inventory before processing
+3. Flag large orders for review
+4. Implement business rules
+
+ERROR CODE: CWE-840
+''',
+            'references': [
+                'OWASP Business Logic',
+                'CWE-840: Business Logic Errors'
+            ]
+        },
+        
+        'Business Logic - Workflow Bypass': {
+            'priority': 'HIGH',
+            'fix_time': '2-3 days',
+            'steps': [
+                'Implement server-side workflow state management',
+                'Validate workflow progression server-side',
+                'Use signed tokens for workflow steps',
+                'Prevent skipping required steps',
+                'Implement step completion verification'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Workflow Bypass:
+1. Multi-step checkout: Cart → Shipping → Payment → Confirm
+2. Attacker skips payment step
+3. Goes directly from shipping to confirm
+4. Order completed without payment
+
+ATTACK TECHNIQUE:
+- Manipulate step parameter: step=4 (skip to final step)
+- Bypass required validation
+''',
+            'code_example': '''
+# Bad (Client controls workflow):
+step = request.GET['step']
+if step == '4':
+    complete_order()
+
+# Good (Server validates workflow):
+session = get_session()
+
+required_steps = ['cart_validated', 'shipping_complete', 'payment_processed']
+for step in required_steps:
+    if not session.get(step):
+        return {"error": "Complete previous steps"}, 400
+
+# All steps verified, proceed
+complete_order()
+session.clear()
+''',
+            'solution': '''
+SOLUTION:
+1. Server-side workflow state tracking
+2. Validate all required steps completed
+3. Use session to track progress
+4. Never trust client-provided step numbers
+5. Clear session after completion
+
+ERROR CODE: CWE-840, CWE-841
+''',
+            'references': [
+                'OWASP Business Logic',
+                'CWE-841: Workflow Enforcement'
+            ]
+        },
+        
+        'Business Logic - Race Condition': {
+            'priority': 'CRITICAL',
+            'fix_time': '2-3 days',
+            'steps': [
+                'Implement database transactions with proper locking',
+                'Use SELECT FOR UPDATE for inventory checks',
+                'Implement optimistic or pessimistic locking',
+                'Add unique constraints where needed',
+                'Use atomic operations',
+                'Implement request deduplication'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Race Condition:
+1. Limited stock item: only 1 remaining
+2. Attacker sends 10 simultaneous purchase requests
+3. All requests check stock simultaneously
+4. All see "1 available"
+5. All 10 purchases succeed
+6. Result: Overselling, negative inventory
+
+ATTACK TECHNIQUE:
+- Send multiple parallel requests
+- Exploit time-of-check to time-of-use (TOCTOU) gap
+''',
+            'code_example': '''
+# Bad (Race condition):
+if product.stock > 0:
+    # Gap here! Other requests can check simultaneously
+    product.stock -= 1
+    product.save()
+    create_order()
+
+# Good (With transaction locking):
+from django.db import transaction
+
+@transaction.atomic
+def purchase_product(product_id):
+    # Lock row for update
+    product = Product.objects.select_for_update().get(id=product_id)
+    
+    if product.stock < 1:
+        raise ValueError("Out of stock")
+    
+    # Atomic decrement
+    product.stock -= 1
+    product.save()
+    create_order(product_id)
+''',
+            'solution': '''
+SOLUTION:
+1. Use database transactions
+2. SELECT FOR UPDATE to lock rows
+3. Atomic operations (decrement)
+4. Handle concurrent requests properly
+5. Implement idempotency keys
+
+ERROR CODE: CWE-362 (Race Condition)
+''',
+            'references': [
+                'OWASP Race Conditions',
+                'CWE-362: Concurrent Execution',
+                'https://owasp.org/www-community/vulnerabilities/Race_Conditions'
+            ]
         }
     }
     
