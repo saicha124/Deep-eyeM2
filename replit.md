@@ -79,14 +79,18 @@ python deep_eye.py --version
 
 ## Recent Changes
 
-- **Information Disclosure Reporting Enhanced - November 4, 2025**
-  - Added comprehensive remediation guide for Information Disclosure vulnerabilities
-  - Now includes common error codes and attack scenarios
-  - Added detailed solutions for disabling debug mode and error messages
-  - Includes code examples for Python/Flask, Django, Node.js, Apache, and Nginx
-  - Added CWE references: CWE-209, CWE-200, CWE-497
-  - Shows specific error patterns: stack traces, database errors, version exposure
-  - Provides step-by-step fix instructions with configuration examples
+- **Comprehensive Remediation Guides Added - November 4, 2025**
+  - Enhanced remediation guides for 9 additional vulnerabilities with error codes and solutions
+  - **Information Disclosure**: CWE-209, CWE-200, CWE-497 with debug mode fixes
+  - **Local File Inclusion (LFI)**: CWE-22, CWE-98, CWE-73 with whitelist implementation
+  - **Remote File Inclusion (RFI)**: CWE-98 with PHP configuration hardening
+  - **Server-Side Template Injection (SSTI)**: CWE-94, CWE-74 with sandbox mode
+  - **CRLF Injection**: CWE-113 with header sanitization
+  - **Open Redirect**: CWE-601 with URL validation
+  - **CORS Misconfiguration**: CWE-346 with origin whitelisting
+  - **Sensitive Data Exposure**: CWE-311, CWE-312, CWE-319 with encryption
+  - **Broken Authentication**: CWE-287 with MFA and lockout mechanisms
+  - All guides include: attack scenarios, error codes, code examples, and step-by-step solutions
 
 - **Import Completed - November 4, 2025**
   - Python 3.12 environment configured
