@@ -42,6 +42,8 @@ class ReportGenerator:
             self._generate_json(results, output_path)
         elif format == 'html':
             self._generate_html(results, output_path)
+            # Also generate vulnerability digest
+            self._generate_vulnerability_digest(results, output_path)
         elif format == 'pdf':
             self._generate_pdf(results, output_path)
         else:
@@ -85,6 +87,8 @@ class ReportGenerator:
                 self._generate_json(results, str(lang_output_path))
             elif format == 'html':
                 self._generate_html(results, str(lang_output_path))
+                # Also generate vulnerability digest for HTML reports
+                self._generate_vulnerability_digest(results, str(lang_output_path))
             elif format == 'pdf':
                 self._generate_pdf(results, str(lang_output_path))
             
@@ -180,6 +184,92 @@ class ReportGenerator:
             f.write(html_content)
         
         logger.info(f"HTML report generated: {output_path} (Language: {self.translator.language})")
+    
+    def _generate_vulnerability_digest(self, results: Dict, original_output_path: str):
+        """Generate a separate HTML vulnerability digest showing all vulnerabilities with code snippets."""
+        # Read the vulnerability digest template
+        template_path = Path(__file__).parent.parent / 'templates' / 'vulnerability_digest.html'
+        
+        if not template_path.exists():
+            logger.warning(f"Vulnerability digest template not found: {template_path}")
+            return
+        
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+        
+        template = Template(template_content)
+        
+        # Read and encode CERIST logo (try SVG first, fallback to PNG)
+        import base64
+        svg_path = Path(__file__).parent.parent / 'assets' / 'cerist_logo.svg'
+        png_path = Path(__file__).parent.parent / 'assets' / 'cerist_logo.png'
+        cerist_logo_base64 = ""
+        
+        try:
+            if svg_path.exists():
+                with open(svg_path, 'r', encoding='utf-8') as f:
+                    svg_data = f.read()
+                    svg_encoded = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
+                    cerist_logo_base64 = f"data:image/svg+xml;base64,{svg_encoded}"
+            elif png_path.exists():
+                with open(png_path, 'rb') as f:
+                    logo_data = base64.b64encode(f.read()).decode('utf-8')
+                    cerist_logo_base64 = f"data:image/png;base64,{logo_data}"
+        except Exception as e:
+            logger.warning(f"Could not load CERIST logo for digest: {e}")
+        
+        # Enhance vulnerabilities with detailed remediation
+        vulnerabilities = results.get('vulnerabilities', [])
+        enhanced_vulns = [RemediationGuide.enhance_vulnerability(v.copy()) for v in vulnerabilities]
+        
+        # Prepare data for template
+        digest_data = {
+            'target': results.get('target', 'Unknown'),
+            'generated_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'vulnerabilities': self._sort_vulnerabilities(enhanced_vulns),
+            'severity_counts': results.get('severity_summary', {}),
+            'cerist_logo': cerist_logo_base64,
+        }
+        
+        html_content = template.render(**digest_data)
+        
+        # Create output path for digest in reports folder
+        path_obj = Path(original_output_path).resolve()
+        
+        # Find the reports directory by walking up the directory tree
+        reports_dir = None
+        for parent in [path_obj.parent] + list(path_obj.parents):
+            if parent.name == 'reports':
+                reports_dir = parent
+                break
+        
+        # If no reports directory found in the path, create one in the parent directory
+        if reports_dir is None:
+            reports_dir = path_obj.parent / 'reports'
+        
+        reports_dir.mkdir(exist_ok=True)
+        
+        # Extract language from filename if present (e.g., report_en.html -> en)
+        lang_suffix = ''
+        stem = path_obj.stem
+        if '_' in stem:
+            parts = stem.split('_')
+            last_part = parts[-1]
+            if last_part in ['en', 'fr', 'ar']:
+                lang_suffix = f'_{last_part}'
+        
+        # Create digest filename with timestamp and optional language suffix
+        import time
+        # Use microseconds to ensure unique filenames even when generated quickly
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S') + f'_{int(time.time() * 1000000) % 1000000:06d}'
+        digest_filename = f'vulnerability_digest{lang_suffix}_{timestamp}.html'
+        digest_output_path = reports_dir / digest_filename
+        
+        with open(digest_output_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        logger.info(f"Vulnerability digest generated: {digest_output_path}")
+        logger.info(f"  └─ {len(enhanced_vulns)} vulnerabilities documented with code snippets")
     
     def _generate_pdf(self, results: Dict, output_path: str):
         """Generate PDF report using ReportLab (Windows-friendly)."""

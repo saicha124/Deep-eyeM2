@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <!-- Background -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield Icon -->
+  <g id="shield">
+    <path d="M 30 20 L 50 15 L 70 20 L 70 50 Q 70 70 50 80 Q 30 70 30 50 Z" 
+          fill="url(#grad1)" stroke="#333" stroke-width="2"/>
+    <path d="M 45 40 L 48 50 L 60 35" 
+          fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- CERIST Text -->
+  <text x="85" y="50" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#333">
+    CERIST
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="85" y="70" font-family="Arial, sans-serif" font-size="12" fill="#666">
+    Centre de Recherche sur l'Information Scientifique et Technique
+  </text>
+  
+  <!-- Security Elements -->
+  <circle cx="360" cy="30" r="8" fill="none" stroke="#667eea" stroke-width="2"/>
+  <circle cx="360" cy="30" r="4" fill="#667eea"/>
+  
+  <path d="M 350 60 L 360 50 L 370 60" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
