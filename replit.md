@@ -112,6 +112,8 @@ python deep_eye.py --version
     - **Module**: Scanner module that detected it (e.g., `core.vulnerability_scanner`)
     - **Function**: Specific detection function (e.g., `_check_security_headers`)
     - **File**: Scanner source file with line range (e.g., `core/vulnerability_scanner.py (Lines 803-856)`)
+    - **📝 Detection Code Snippet**: Automatically extracts and displays the actual code from those lines (up to 50 lines)
+    - Shows the exact scanner code that detected the vulnerability with copy button
     - Automatically constructs file path from module name if not explicitly provided
   - **Complete Attack Chain Visualization**:
     - 📋 Description → What the vulnerability is
