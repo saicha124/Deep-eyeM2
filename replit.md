@@ -105,7 +105,11 @@ python deep_eye.py --version
   - Workflow configured and tested - "Deep Eye Scanner" running successfully
   - **Fixed missing templates directory**: Recreated `templates/vulnerability_digest.html`
     - Template was missing after migration causing "template not found" errors
-    - Fully functional vulnerability digest with all enhanced features
+    - **Redesigned to match main report style**: Professional, clean design
+    - White header with CERIST logo (same as main report)
+    - Grid-based metadata cards with color scheme matching main report
+    - Border-left vulnerability cards (consistent with main report design)
+    - Same footer style with CERIST branding
     - Interactive expandable/collapsible cards, copy-to-clipboard, responsive design
   - **Fixed template interaction structure**: Updated to match flat interaction dict
     - Changed from nested `interaction.request.method` to flat `interaction.method`
