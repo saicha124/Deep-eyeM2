@@ -107,6 +107,10 @@ python deep_eye.py --version
     - Template was missing after migration causing "template not found" errors
     - Fully functional vulnerability digest with all enhanced features
     - Interactive expandable/collapsible cards, copy-to-clipboard, responsive design
+  - **Fixed template interaction structure**: Updated to match flat interaction dict
+    - Changed from nested `interaction.request.method` to flat `interaction.method`
+    - Template now correctly accesses: method, url, headers, request_body, status_code, response_body, latency
+    - Fixed Jinja2 "dict object has no attribute 'request'" error
   - **Verified enhance_vulnerability function**: Already has correct field copying
     - code_example, solution, steps_to_fix, exploit_example, references
     - All fields properly copied from remediation_details to main vulnerability object
