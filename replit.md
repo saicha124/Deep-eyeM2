@@ -98,24 +98,31 @@ python deep_eye.py --version
 
 ## Recent Changes
 
-- **🎨 Code Comparison Now Available for ALL Vulnerabilities - November 6, 2025**
-  - **Extended to All Major Vulnerability Types**: Code comparison now available for:
+- **🎨 Code Comparison Now Available for 8 Major Vulnerability Types - November 6, 2025**
+  - **Extended to All Critical Vulnerability Types**: Code comparison now available for:
     - ✅ **SQL Injection**: Shows vulnerable string concatenation vs secure parameterized queries
     - ✅ **Cross-Site Scripting (XSS)**: Shows unescaped output vs properly escaped HTML
     - ✅ **Command Injection**: Shows os.system() vulnerability vs secure subprocess usage
     - ✅ **Security Misconfiguration**: Shows missing headers vs framework-specific implementations
+    - ✅ **Business Logic - Price Manipulation**: Shows client-side price trust vs server-side validation
+    - ✅ **Business Logic - Negative Quantity**: Shows no validation vs proper quantity checks
+    - ✅ **Path Traversal**: Shows direct path concatenation vs secure path validation
+    - ✅ **SSRF (Server-Side Request Forgery)**: Shows unrestricted URL fetching vs whitelist validation
   - **Black Text on Colored Backgrounds**: Fixed text color for better readability
     - Code blocks now display in black (#000000) on light colored backgrounds
     - Ensures maximum contrast and readability for all code examples
   - **Automatic Enhancement**: All vulnerabilities automatically get code examples through remediation guide
     - No need to manually add code examples to each scanner
     - Remediation database provides consistent, high-quality examples
-    - Template displays code comparison for any vulnerability with these fields
+    - Template displays code comparison for any vulnerability with vulnerable_code and solution_code fields
   - **Framework-Specific Examples**: Each vulnerability type includes real-world code:
-    - SQL Injection: Python/Flask with SQLite
-    - XSS: Python/Flask with template rendering
-    - Command Injection: Python/Flask with subprocess
+    - SQL Injection: Python/Flask with SQLite parameterized queries
+    - XSS: Python/Flask with markupsafe escaping
+    - Command Injection: Python/Flask with subprocess module
     - Security Headers: Flask, Express.js, Nginx, Django, Apache
+    - Business Logic: E-commerce applications with validation
+    - Path Traversal: File download with Path.resolve() validation
+    - SSRF: URL fetching with whitelist and IP blocking
 
 - **✅ Color-Coded Solution Display Fully Working - November 5, 2025**
   - **Vulnerable vs Solution Code Comparison**: Reports now show side-by-side code comparison

@@ -292,6 +292,57 @@ Set-Cookie: session=...; SameSite=Strict; Secure; HttpOnly
                 'Block access to private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)',
                 'Implement request signing for internal API calls'
             ],
+            'vulnerable_code': '''# Web Application - VULNERABLE
+from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
+
+@app.route('/fetch')
+def fetch_url():
+    # VULNERABLE: No URL validation
+    url = request.args.get('url')
+    
+    # Attacker can access internal services!
+    # Example: ?url=http://localhost:8080/admin
+    # Example: ?url=http://169.254.169.254/latest/meta-data
+    response = requests.get(url)
+    
+    return jsonify({"content": response.text})''',
+            'solution_code': '''# Web Application - SECURE
+from flask import Flask, request, jsonify, abort
+import requests
+from urllib.parse import urlparse
+
+app = Flask(__name__)
+
+def is_safe_url(url):
+    parsed = urlparse(url)
+    
+    # Whitelist allowed hosts
+    allowed_hosts = ['api.example.com', 'data.example.com']
+    if parsed.hostname not in allowed_hosts:
+        return False
+    
+    # Block private IP ranges
+    private_ips = ['localhost', '127.0.0.1', '169.254.169.254']
+    if parsed.hostname in private_ips:
+        return False
+    if parsed.hostname.startswith(('192.168.', '10.', '172.16.')):
+        return False
+    
+    return True
+
+@app.route('/fetch')
+def fetch_url():
+    url = request.args.get('url')
+    
+    # SECURE: Validate URL before request
+    if not is_safe_url(url):
+        abort(403, "URL not allowed")
+    
+    response = requests.get(url, timeout=5)
+    return jsonify({"content": response.text})''',
             'code_example': '''
 # Validate URL before making request:
 from urllib.parse import urlparse
@@ -327,6 +378,44 @@ def is_safe_url(url):
                 'Reject paths containing ".." or absolute paths',
                 'Use indirect object references (map IDs to files)'
             ],
+            'vulnerable_code': '''# File Download Application - VULNERABLE
+from flask import Flask, request, send_file
+import os
+
+app = Flask(__name__)
+
+@app.route('/download')
+def download_file():
+    # VULNERABLE: No path validation
+    filename = request.args.get('file')
+    file_path = f"/var/data/{filename}"
+    
+    # Attacker can use: ?file=../../etc/passwd
+    # This reads ANY file on the system!
+    return send_file(file_path)''',
+            'solution_code': '''# File Download Application - SECURE
+from flask import Flask, request, send_file, abort
+from pathlib import Path
+
+app = Flask(__name__)
+
+@app.route('/download')
+def download_file():
+    filename = request.args.get('file')
+    
+    # SECURE: Validate and canonicalize path
+    base_dir = Path("/var/data").resolve()
+    file_path = (base_dir / filename).resolve()
+    
+    # Ensure file is within allowed directory
+    if not file_path.is_relative_to(base_dir):
+        abort(403, "Access denied")
+    
+    # Check file exists
+    if not file_path.exists():
+        abort(404, "File not found")
+    
+    return send_file(file_path)''',
             'code_example': '''
 # Bad (Vulnerable):
 file_path = f"/var/data/{user_input}"
@@ -1243,6 +1332,51 @@ ERROR CODE: CWE-287 (Improper Authentication)
                 'Implement price range validation',
                 'Use decimal precision for currency calculations'
             ],
+            'vulnerable_code': '''# E-commerce Application - VULNERABLE
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    # VULNERABLE: Trusts client-provided price
+    price = request.json['price']
+    product_id = request.json['productId']
+    
+    # Attacker can modify price to anything!
+    # Example: {"price": -100.00, "productId": 123}
+    # Result: Attacker gets PAID instead of paying
+    
+    process_payment(price)
+    return jsonify({"status": "success", "charged": price})''',
+            'solution_code': '''# E-commerce Application - SECURE
+from flask import Flask, request, jsonify
+from models import Product
+
+app = Flask(__name__)
+
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    product_id = request.json['productId']
+    
+    # SECURE: Lookup price from database (server-side)
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({"error": "Invalid product"}), 400
+    
+    # Use server-side price (NEVER trust client)
+    server_price = product.price
+    
+    # Validate price is positive
+    if server_price <= 0:
+        return jsonify({"error": "Invalid price"}), 400
+    
+    # Log transaction for audit
+    log_transaction(product_id, server_price)
+    
+    # Process with verified server price
+    process_payment(server_price)
+    return jsonify({"status": "success", "charged": server_price})''',
             'exploit_example': '''
 ATTACK SCENARIO - Price Manipulation:
 1. Find price parameter in request: POST /checkout {price: 99.99, productId: 123}
@@ -1338,6 +1472,55 @@ FINANCIAL IMPACT: Direct monetary loss, fraud, chargebacks
                 'Log suspicious quantity attempts',
                 'Implement cart validation before checkout'
             ],
+            'vulnerable_code': '''# E-commerce Application - VULNERABLE
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/cart/add', methods=['POST'])
+def add_to_cart():
+    item_price = 50.00
+    # VULNERABLE: No quantity validation
+    quantity = int(request.json.get('quantity'))
+    total_price = item_price * quantity
+    
+    # Negative quantity results in negative total!
+    # Example: quantity=-5 → total_price=-250.00
+    # User gets REFUND instead of being charged
+    
+    return jsonify({
+        "quantity": quantity,
+        "total": total_price
+    })''',
+            'solution_code': '''# E-commerce Application - SECURE
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/cart/add', methods=['POST'])
+def add_to_cart():
+    item_price = 50.00
+    # SECURE: Validate quantity
+    quantity = int(request.json.get('quantity', 0))
+    
+    # Reject negative values
+    if quantity < 1:
+        return jsonify({"error": "Quantity must be positive"}), 400
+    
+    # Set maximum limit
+    if quantity > 100:
+        return jsonify({"error": "Maximum quantity is 100"}), 400
+    
+    total_price = item_price * quantity
+    
+    # Double-check total is positive
+    if total_price <= 0:
+        return jsonify({"error": "Invalid total"}), 400
+    
+    return jsonify({
+        "quantity": quantity,
+        "total": total_price
+    })''',
             'exploit_example': '''
 ATTACK SCENARIO - Negative Quantity:
 1. Add item to cart with normal quantity
