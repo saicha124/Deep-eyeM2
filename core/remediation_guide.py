@@ -263,6 +263,40 @@ subprocess.run(["ping", "-c", "4", user_ip], timeout=5)
                 'Require re-authentication for sensitive actions',
                 'Use frameworks with built-in CSRF protection'
             ],
+            'vulnerable_code': '''# Flask Application - VULNERABLE
+from flask import Flask, request, session
+
+app = Flask(__name__)
+
+@app.route('/transfer', methods=['POST'])
+def transfer_money():
+    # VULNERABLE: No CSRF protection
+    amount = request.form['amount']
+    recipient = request.form['recipient']
+    
+    # Attacker can forge this request from their site
+    # and steal money when victim visits
+    process_transfer(session['user_id'], recipient, amount)
+    return "Transfer complete"''',
+            'solution_code': '''# Flask Application - SECURE
+from flask import Flask, request, session, abort
+from flask_wtf.csrf import CSRFProtect
+
+app = Flask(__name__)
+csrf = CSRFProtect(app)
+
+@app.route('/transfer', methods=['POST'])
+def transfer_money():
+    # SECURE: CSRF token automatically validated by Flask-WTF
+    amount = request.form['amount']
+    recipient = request.form['recipient']
+    
+    # Process only if CSRF token is valid
+    process_transfer(session['user_id'], recipient, amount)
+    return "Transfer complete"
+
+# In template: <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+# Cookie: Set-Cookie: session=...; SameSite=Strict; Secure; HttpOnly''',
             'code_example': '''
 # Generate CSRF token:
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -446,6 +480,51 @@ if not file_path.is_relative_to(base_dir):
                 'Implement proper logout functionality',
                 'Set secure session timeout values'
             ],
+            'vulnerable_code': '''# Authentication System - VULNERABLE
+from flask import Flask, request, session
+import hashlib
+
+app = Flask(__name__)
+
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
+    
+    # VULNERABLE: Weak hashing (MD5)
+    hashed = hashlib.md5(password.encode()).hexdigest()
+    
+    user = User.query.filter_by(username=username).first()
+    if user and user.password_hash == hashed:
+        session['user_id'] = user.id  # No expiration
+        return "Logged in"
+    return "Failed"''',
+            'solution_code': '''# Authentication System - SECURE
+from flask import Flask, request, session
+import bcrypt
+from datetime import datetime, timedelta
+
+app = Flask(__name__)
+
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
+    
+    user = User.query.filter_by(username=username).first()
+    
+    # SECURE: bcrypt hashing with salt
+    if user and bcrypt.checkpw(password.encode(), user.password_hash):
+        session['user_id'] = user.id
+        session['expires'] = datetime.now() + timedelta(hours=1)
+        session.permanent = False
+        return "Logged in"
+    
+    # Rate limiting for failed attempts
+    if user:
+        user.failed_attempts += 1
+        user.save()
+    return "Failed", 401''',
             'code_example': '''
 # Secure password hashing:
 import bcrypt
@@ -477,6 +556,50 @@ if bcrypt.checkpw(password.encode(), stored_hash):
                 'Implement token refresh mechanism',
                 'Use HTTPS to prevent token interception'
             ],
+            'vulnerable_code': '''# JWT Authentication - VULNERABLE
+import jwt
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/api/data')
+def get_data():
+    token = request.headers.get('Authorization')
+    
+    # VULNERABLE: No signature verification!
+    # Accepts algorithm='none' attacks
+    payload = jwt.decode(token, options={"verify_signature": False})
+    
+    # Attacker can forge any token
+    user_id = payload['user_id']
+    return get_user_data(user_id)''',
+            'solution_code': '''# JWT Authentication - SECURE
+import jwt
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+SECRET_KEY = "your-secret-key"  # Store in env variable
+
+@app.route('/api/data')
+def get_data():
+    token = request.headers.get('Authorization')
+    
+    try:
+        # SECURE: Verify signature and all claims
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"],  # Whitelist algorithms
+            options={
+                "verify_signature": True,
+                "verify_exp": True,
+                "require": ["exp", "user_id"]
+            }
+        )
+        user_id = payload['user_id']
+        return get_user_data(user_id)
+    except jwt.InvalidTokenError:
+        abort(401, "Invalid token")''',
             'code_example': '''
 # Secure JWT validation:
 import jwt
@@ -514,6 +637,47 @@ except jwt.InvalidTokenError:
                 'Run deserialization in isolated/sandboxed environment',
                 'Monitor for suspicious deserialization patterns'
             ],
+            'vulnerable_code': '''# Python Application - VULNERABLE
+import pickle
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/load', methods=['POST'])
+def load_data():
+    user_data = request.data
+    
+    # VULNERABLE: Deserializes untrusted data
+    # Attacker can execute arbitrary code!
+    obj = pickle.loads(user_data)
+    
+    # Remote Code Execution possible
+    return str(obj)''',
+            'solution_code': '''# Python Application - SECURE
+import json
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/load', methods=['POST'])
+def load_data():
+    user_data = request.data
+    
+    # SECURE: Use safe JSON deserialization
+    try:
+        obj = json.loads(user_data)
+        
+        # Validate the data structure
+        if not isinstance(obj, dict):
+            return "Invalid data", 400
+        
+        # Process only expected fields
+        allowed_keys = {'name', 'email', 'age'}
+        obj = {k: v for k, v in obj.items() if k in allowed_keys}
+        
+        return json.dumps(obj)
+    except json.JSONDecodeError:
+        return "Invalid JSON", 400''',
             'code_example': '''
 # Bad (Vulnerable):
 import pickle
